@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aviator Crash Game</title>
+  <style>
+    body {
+      margin: 0;
+      background: black;
+      color: white;
+      font-family: sans-serif;
+      aspect-ratio: 9/16;
+      overflow: hidden;
+    }
+    
+    /* Auth Screen Styles */
+    .auth-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      padding: 20px;
+    }
+    
+    .auth-form {
+      background: #111;
+      padding: 20px;
+      border-radius: 10px;
+      width: 90%;
+      max-width: 400px;
+      box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+    }
+    
+    .auth-form h2 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #0f0;
+    }
+    
+    .auth-form input {
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0;
+      background: #222;
+      color: white;
+      border: 1px solid #0f0;
+      border-radius: 5px;
+    }
+    
+    .auth-form button {
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0;
+      background: #0f0;
+      color: black;
+      border: none;
+      border-radius: 5px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    
+    .auth-toggle {
+      text-align: center;
+      margin-top: 15px;
+      color: #0f0;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+    
+    /* Main Game Styles (hidden initially) */
+    .game-container {
+      display: none;
+    }
+    
+    header {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px;
+      background: #111;
+    }
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .wallet {
+      color: #0f0;
+    }
+    .actions {
+      padding: 10px;
+    }
+    .actions button {
+      background: #333;
+      color: white;
+      border: 1px solid #0f0;
+      padding: 5px 10px;
+      margin: 5px;
+    }
+    .game-screen {
+      height: 40vh;
+      background: radial-gradient(circle, #00111c, black);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .plane {
+      position: absolute;
+      left: 0;
+      bottom: 30px;
+      font-size: 32px;
+      transition: left 0.1s linear;
+    }
+    .multiplier {
+      font-size: 32px;
+      text-shadow: 0 0 10px red;
+    }
+    .timer {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+    }
+    .history {
+      padding: 10px;
+      background: #111;
+    }
+    .bet-box {
+      background: #111;
+      margin: 5px;
+      width: 90%;
+      padding: 10px;
+      border-radius: 10px;
+    }
+    .bet-box input,
+    .bet-box button {
+      width: 100%;
+      height: 40px;
+      font-size: 16px;
+      text-align: center;
+      margin: 5px 0;
+      background: #222;
+      color: white;
+      border: 1px solid #0f0;
+    }
+    .result-log {
+      padding: 10px;
+      font-size: 12px;
+      height: 80px;
+      overflow-y: auto;
+      border-top: 1px solid #0f0;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Auth Screen -->
+<div id="authScreen" class="auth-container">
+  <div id="loginForm" class="auth-form">
+    <h2>Login</h2>
+    <input type="text" id="loginUsername" placeholder="Username" required>
+    <input type="password" id="loginPassword" placeholder="Password" required>
+    <button onclick="login()">LOGIN</button>
+    <div class="auth-toggle" onclick="showSignup()">Don't have an account? Sign up</div>
+  </div>
+  
+  <div id="signupForm" class="auth-form" style="display:none">
+    <h2>Sign Up</h2>
+    <input type="text" id="signupUsername" placeholder="Username" required>
+    <input type="password" id="signupPassword" placeholder="Password" required>
+    <input type="password" id="signupConfirmPassword" placeholder="Confirm Password" required>
+    <button onclick="signup()">SIGN UP</button>
+    <div class="auth-toggle" onclick="showLogin()">Already have an account? Login</div>
+  </div>
+</div>
+
+<!-- Main Game (hidden initially) -->
+<div id="gameContainer" class="game-container">
+  <header>
+    <h2>✈️ Aviator</h2>
+    <div class="user-info">
+      <span id="usernameDisplay"></span>
+      <div class="wallet">Balance: ₹<span id="balance">1000</span></div>
+    </div>
+  </header>
+
+  <div class="actions">
+    <button onclick="wa('Please add money to my account')">Deposit ₹100</button>
+    <button onclick="wa('Please withdraw my money')">Withdraw ₹100</button>
+  </div>
+
+  <div class="history">
+    Crash History: <span id="history"></span>
+  </div>
+
+  <div class="game-screen">
+    <div class="plane" id="plane">🛩️</div>
+    <div class="multiplier" id="multiplier">1.00x</div>
+    <div class="timer" id="timer">10</div>
+  </div>
+
+  <div class="bet-box">
+    <input id="betAmount" value="10">
+    <button id="betButton" onclick="placeBet()">BET ₹10</button>
+  </div>
+
+  <div class="result-log" id="resultLog"></div>
+</div>
+
+<script>
+// User data storage
+let users = JSON.parse(localStorage.getItem('aviator_users')) || [];
+let currentUser = null;
+
+// Game variables
+let bal = 1000, mult = 1.0, flying = false, placed = false,
+    timerEl, multEl, plane, btn, amt, resultLog,
+    hist = [], log = [], left = 0, timeLeft = 10, interval;
+
+// DOM Elements
+let authScreen = document.getElementById('authScreen');
+let gameContainer = document.getElementById('gameContainer');
+let loginForm = document.getElementById('loginForm');
+let signupForm = document.getElementById('signupForm');
+let usernameDisplay = document.getElementById('usernameDisplay');
+
+// Show login form
+function showLogin() {
+  loginForm.style.display = 'block';
+  signupForm.style.display = 'none';
+}
+
+// Show signup form
+function showSignup() {
+  loginForm.style.display = 'none';
+  signupForm.style.display = 'block';
+}
+
+// Sign up new user
+function signup() {
+  const username = document.getElementById('signupUsername').value;
+  const password = document.getElementById('signupPassword').value;
+  const confirmPassword = document.getElementById('signupConfirmPassword').value;
+  
+  if (!username || !password || !confirmPassword) {
+    alert('Please fill all fields');
+    return;
+  }
+  
+  if (password !== confirmPassword) {
+    alert('Passwords do not match');
+    return;
+  }
+  
+  if (users.some(user => user.username === username)) {
+    alert('Username already exists');
+    return;
+  }
+  
+  users.push({
+    username,
+    password,
+    balance: 1000,
+    history: [],
+    logs: []
+  });
+  
+  localStorage.setItem('aviator_users', JSON.stringify(users));
+  alert('Signup successful! Please login');
+  showLogin();
+}
+
+// Login user
+function login() {
+  const username = document.getElementById('loginUsername').value;
+  const password = document.getElementById('loginPassword').value;
+  
+  const user = users.find(u => u.username === username && u.password === password);
+  
+  if (!user) {
+    alert('Invalid username or password');
+    return;
+  }
+  
+  currentUser = user;
+  initializeGame();
+  authScreen.style.display = 'none';
+  gameContainer.style.display = 'block';
+}
+
+// Initialize game with user data
+function initializeGame() {
+  bal = currentUser.balance || 1000;
+  hist = currentUser.history || [];
+  log = currentUser.logs || [];
+  
+  if (hist.length === 0) hist.push('1.00');
+  
+  balEl = document.getElementById('balance');
+  multEl = document.getElementById('multiplier');
+  plane = document.getElementById('plane');
+  btn = document.getElementById('betButton');
+  amt = document.getElementById('betAmount');
+  timerEl = document.getElementById('timer');
+  resultLog = document.getElementById('resultLog');
+  
+  // Display username
+  usernameDisplay.textContent = currentUser.username;
+  
+  updateBal();
+  updateHist(hist[0]);
+  countdown();
+  
+  // Update result log
+  resultLog.innerHTML = log.join('<br>');
+}
+
+// Save user data
+function saveUserData() {
+  if (!currentUser) return;
+  
+  currentUser.balance = bal;
+  currentUser.history = hist;
+  currentUser.logs = log;
+  
+  const index = users.findIndex(u => u.username === currentUser.username);
+  if (index !== -1) {
+    users[index] = currentUser;
+    localStorage.setItem('aviator_users', JSON.stringify(users));
+  }
+}
+
+function updateBal() {
+  balEl.textContent = bal.toFixed(2);
+  saveUserData();
+}
+
+function updateHist(x) {
+  hist.unshift(x);
+  if (hist.length > 5) hist.pop();
+  document.getElementById('history').textContent = hist.join('x  ') + 'x';
+  saveUserData();
+}
+
+function logRes(x) {
+  log.unshift(x);
+  if (log.length > 10) log.pop();
+  resultLog.innerHTML = log.join('<br>');
+  saveUserData();
+}
+
+function countdown() {
+  timeLeft = 10;
+  timerEl.textContent = timeLeft;
+  const c = setInterval(() => {
+    timeLeft--;
+    timerEl.textContent = timeLeft;
+    if (timeLeft <= 0) {
+      clearInterval(c);
+      startFlight();
+    }
+  }, 1000);
+}
+
+function placeBet() {
+  let v = parseFloat(amt.value);
+  if (!placed && !flying && v > 0 && bal >= v) {
+    placed = true;
+    bal -= v;
+    updateBal();
+    btn.textContent = 'WAIT';
+  } else if (flying && placed) {
+    let p = v * mult;
+    bal += p;
+    updateBal();
+    logRes(`✅ Cashed Out at ${mult.toFixed(2)}x | ₹${p.toFixed(2)}`);
+    placed = false;
+    btn.textContent = 'BET ₹' + amt.value;
+  }
+}
+
+function startFlight() {
+  mult = 1.0;
+  left = 0;
+  flying = true;
+  interval = setInterval(() => {
+    mult += 0.01;
+    left += 3;
+    plane.style.left = left + 'px';
+    multEl.textContent = mult.toFixed(2) + 'x';
+    if (placed)
+      btn.textContent = 'CASH OUT ₹' + (parseFloat(amt.value) * mult).toFixed(2);
+    if (Math.random() < 0.01 || mult > 5) crash();
+  }, 100);
+}
+
+function crash() {
+  flying = false;
+  clearInterval(interval);
+  updateHist(mult.toFixed(2));
+  if (placed) logRes(`❌ Lost at ${mult.toFixed(2)}x`);
+  placed = false;
+  setTimeout(() => {
+    multEl.textContent = '1.00x';
+    plane.style.left = '0px';
+    btn.textContent = 'BET ₹' + amt.value;
+    countdown();
+  }, 3000);
+}
+
+function wa(msg) {
+  window.open(`https://wa.me/9608098566?text=${encodeURIComponent(msg)}`, '_blank');
+}
+
+// Initialize auth screen on load
+window.onload = () => {
+  showLogin();
+};
+</script>
+
+</body>
+</html>
